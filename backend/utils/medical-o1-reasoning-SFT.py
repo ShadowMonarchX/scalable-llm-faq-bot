@@ -5,14 +5,14 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import nltk
 import spacy
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 from huggingface_hub import hf_hub_download
 from nltk.corpus import stopwords
 from tqdm import tqdm
 import spacy.cli
 
-load_dotenv()
-hf_token = os.getenv("HF_TOKEN")
+# load_dotenv()
+# hf_token = os.getenv("HF_TOKEN")
 
 
 nltk.download("punkt")
