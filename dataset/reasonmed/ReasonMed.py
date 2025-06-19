@@ -13,11 +13,11 @@ import spacy
 import spacy.cli
 from nltk.corpus import stopwords
 
-# from dotenv import load_dotenv
+from dotenv import load_dotenv
 
 
-# load_dotenv()
-# hf_token = os.getenv("HF_TOKEN")
+load_dotenv()
+hf_token = os.getenv("HF_TOKEN")
 
 
 

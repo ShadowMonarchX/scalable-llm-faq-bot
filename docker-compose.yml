@@ -1,0 +1,42 @@
+version: '3.9'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: faq-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+    depends_on:
+      - chromadb
+    environment:
+      - CHROMA_HOST=chromadb
+      - CHROMA_PORT=8000
+      - HF_TOKEN=${HF_TOKEN}
+    command: ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  chromadb:
+    image: chromadb/chroma
+    container_name: chromadb
+    ports:
+      - "8001:8000"  # Expose ChromaDB on a different external port
+    volumes:
+      - chroma_data:/chroma/chroma
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: faq-frontend
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./frontend:/frontend
+    depends_on:
+      - api
+
+volumes:
+  chroma_data:

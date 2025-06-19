@@ -1,12 +1,39 @@
+version: 1.0
+
+# Toolchain metadata
+toolchain:
+  name: scalable-llm-faq-bot
+  description: >
+    An LLM-powered FAQ assistant using Hugging Face models, ChromaDB vector search, and LangChain tools.
+  author: Jenish Shekhada
+  language: python
+
+# Define MCP-compatible tools
 tools:
-  - name: retrieve_from_docs
-    type: python
-    entrypoint: mcp_tools.retriever_tool:retrieve
+  - name: retriever_tool
+    type: retrieval
+    path: mcp_tools.retriever_tool:RetrieverTool
+    description: Retrieve relevant documents from ChromaDB based on query.
 
-  - name: generate_answer
-    type: python
-    entrypoint: mcp_tools.llm_tool:generate
+  - name: llm_tool
+    type: llm
+    path: mcp_tools.llm_tool:LLMTool
+    description: Generate answers using a Hugging Face model via LangChain.
 
-pipeline:
-  - retrieve_from_docs
-  - generate_answer
+# Tool routing logic
+routing:
+  - input_type: query
+    steps:
+      - tool: retriever_tool
+        input_key: query
+        output_key: context_docs
+
+      - tool: llm_tool
+        input_key: context_docs
+        output_key: final_response
+
+# Server behavior
+settings:
+  allow_file_upload: true
+  auth_required: false
+  log_level: info

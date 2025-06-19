@@ -1,0 +1,72 @@
+# Byte-compiled / cache files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Virtual environments
+env/
+venv/
+.venv/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# Dataset and model artifacts
+dataset/
+gpt-finetuned-*/
+*.ckpt
+*.pt
+*.h5
+*.onnx
+*.tflite
+*.npz
+*.npy
+
+# Logs and temp files
+*.log
+logs/
+*.tmp
+*.swp
+
+# VSCode, PyCharm and editor-specific
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Hugging Face & Transformers cache
+~/.cache/
+~/.huggingface/
+
+# Environment variables and config
+.env
+.env.*
+
+# Docker-related
+*.pid
+docker-compose.override.yml
+
+# Test results
+coverage/
+htmlcov/
+.cache/
+pytest_cache/
+.pytest_cache/
+
+# Build artifacts
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+MANIFEST
+
+# Gitignore self
+.gitignore

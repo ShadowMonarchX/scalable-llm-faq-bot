@@ -1,0 +1,45 @@
+# Ignore Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.log
+
+# Ignore virtual environments
+venv/
+env/
+
+# Ignore notebooks and temp files
+*.ipynb
+*.tmp
+*.swp
+.DS_Store
+
+# Ignore data & checkpoints
+*.ckpt
+*.pt
+*.h5
+*.onnx
+*.tflite
+*.npz
+*.npy
+
+# Ignore Hugging Face cache
+~/.cache/
+~/.huggingface/
+
+# Ignore datasets and training artifacts
+dataset/
+logs/
+gpt-finetuned-*/
+
+# Ignore test artifacts
+tests/__pycache__/
+tests/*.log
+
+# Git stuff
+.git/
+.gitignore
+
+# Other configs
+docker-compose.override.yml
