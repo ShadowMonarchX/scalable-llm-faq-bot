@@ -16,7 +16,7 @@ class UploadRequest(BaseModel):
 
 @router.get("/health")
 async def health_check():
-    return {"status": "✅ Server is running."}
+    return {"status": "Server is running."}
 
 @router.post("/query")
 async def query_handler(request: QueryRequest):
@@ -31,6 +31,6 @@ async def query_handler(request: QueryRequest):
 async def upload_documents(request: UploadRequest):
     try:
         vector_store.add_documents(request.documents, request.metadatas, request.ids)
-        return {"status": "✅ Documents uploaded successfully."}
+        return {"status": "Documents uploaded successfully."}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

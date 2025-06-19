@@ -1,4 +1,5 @@
 import os
+import json
 import torch
 import pandas as pd
 from datasets import Dataset
@@ -14,7 +15,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 # ------------------ Config ------------------ #
 model_name = "EleutherAI/gpt-neo-125M"
-data_path = "/content/fine_tune_data.jsonl"
+data_path = os.path.join(os.getcwd(), "dataset", "medical_o1_reasoning_sft", "fine_tune_data.jsonl")
 output_dir = "./neo_outputs"
 logging_dir = "./neo_logs"
 
@@ -36,7 +37,22 @@ except Exception as e:
 try:
     abs_path = os.path.abspath(data_path)
     print(f"Loading dataset from: {abs_path}")
-    df = pd.read_json(abs_path, lines=True)
+
+    if not os.path.exists(abs_path) or os.path.getsize(abs_path) == 0:
+        raise FileNotFoundError("Dataset file does not exist or is empty.")
+
+    with open(abs_path, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    if not lines:
+        raise ValueError("Dataset file is empty.")
+
+    records = [json.loads(line) for line in lines]  # ✅ FIXED HERE
+    df = pd.DataFrame(records)
+
+    if df.empty:
+        raise ValueError("Parsed DataFrame is empty.")
+
     dataset = Dataset.from_pandas(df)
 except Exception as e:
     raise RuntimeError(f"Failed to load dataset: {e}")

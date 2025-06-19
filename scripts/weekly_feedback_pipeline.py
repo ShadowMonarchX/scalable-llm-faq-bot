@@ -20,7 +20,7 @@ def main():
                     "response": entry["corrected_response"]
                 }, f)
                 f.write("\n")
-    print("✅ Appended new training data for fine-tuning.")
+    print("Appended new training data for fine-tuning.")
 
 if __name__ == "__main__":
     main()

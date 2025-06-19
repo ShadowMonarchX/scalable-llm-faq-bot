@@ -4,13 +4,13 @@ import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
 from rouge_score import rouge_scorer
 
-# Load fine-tuned model
-model_path = "./gpt-finetuned-customer-support"  # Update if model path differs
+
+model_path = "./gpt-finetuned-customer-support" 
 tokenizer = AutoTokenizer.from_pretrained(model_path)
 model = AutoModelForCausalLM.from_pretrained(model_path)
 model.eval()
 
-# Response generator
+
 def generate_response(prompt, max_tokens=100):
     input_text = f"### Question:\n{prompt}\n\n### Answer:\n"
     inputs = tokenizer(input_text, return_tensors="pt").to(model.device)
@@ -26,7 +26,7 @@ def generate_response(prompt, max_tokens=100):
     decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
     return decoded.split("### Answer:")[-1].strip()
 
-# Load validation examples
+
 val_path = "dataset/val.jsonl"  # Or use dataset/reasonmed/val.jsonl
 assert os.path.exists(val_path), f"Validation file not found: {val_path}"
 
@@ -42,9 +42,9 @@ for sample in val_samples[:10]:  # Limit to 10 for preview
     expected = sample['response']
     predicted = generate_response(prompt)
     results.append((prompt, expected, predicted))
-    print(f"\n🟡 Question: {prompt}")
-    print(f"✅ Expected: {expected}")
-    print(f"🔷 Predicted: {predicted}")
+    print(f"\nQuestion: {prompt}")
+    print(f"Expected: {expected}")
+    print(f"Predicted: {predicted}")
 
 # ROUGE-L Evaluation
 scorer = rouge_scorer.RougeScorer(['rougeL'], use_stemmer=True)
