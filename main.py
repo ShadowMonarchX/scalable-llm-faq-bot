@@ -1,39 +1,40 @@
-from fastapi import FastAPI
+# main.py
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.agents import initialize_agent
 from langchain.llms import HuggingFaceHub
 from mcp_tools.retriever_tool import retriever_tool
 from mcp_tools.llm_tool import llm_tool
-from api import all_routes  # Combines routes from routes.py and model_api.py
+from api import all_routes  # Combine and expose all routers
 
-# Initialize FastAPI app
+# ------------------ FastAPI Setup ------------------ #
 app = FastAPI(
     title="Scalable LLM-Powered FAQ Bot",
-    description="FastAPI + LangChain + HuggingFace + MCP integration",
+    description="FastAPI + LangChain + Hugging Face + MCP Integration",
     version="1.0.0"
 )
 
-# CORS configuration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # For development, allow all. In production, restrict this.
+    allow_origins=["*"],  # Change to allowed domains in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Register all API routers (query, upload, health, predict)
+# ------------------ Register API Routes ------------------ #
 for route in all_routes:
     app.include_router(route, prefix="/api")
 
-# Load LLM from Hugging Face Hub (can switch to local model)
+# ------------------ LLM + Agent (LangChain) ------------------ #
 llm = HuggingFaceHub(
-    repo_id="tiiuae/falcon-7b-instruct",  # Or your own HF model
+    repo_id="tiiuae/falcon-7b-instruct",  # Switch to your HF repo if needed
     model_kwargs={"temperature": 0.5, "max_new_tokens": 256}
 )
 
-# Initialize LangChain agent with MCP-compatible tools
 tools = [retriever_tool, llm_tool]
+
 agent = initialize_agent(
     tools=tools,
     llm=llm,
@@ -41,16 +42,19 @@ agent = initialize_agent(
     verbose=True
 )
 
-# Root health endpoint
+# ------------------ Health Check ------------------ #
 @app.get("/")
 async def root():
     return {"message": "✅ Scalable FAQ Bot is running."}
 
-# MCP-compatible agent query endpoint
+# ------------------ MCP-Compatible Endpoint ------------------ #
 @app.post("/mcp-query")
 async def mcp_query(payload: dict):
     query = payload.get("question")
     if not query:
         return {"error": "Missing 'question' in payload."}
-    response = agent.run(query)
-    return {"response": response}
+    try:
+        response = agent.run(query)
+        return {"response": response}
+    except Exception as e:
+        return {"error": f"Agent failed: {str(e)}"}

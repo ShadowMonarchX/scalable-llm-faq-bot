@@ -10,7 +10,7 @@ from vector_store.vector_handler import load_vector_store
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 
 
-def get_hf_llm(model_id="EleutherAI/gpt-neo-125M"):
+def get_hf_llm(model_id: str = "EleutherAI/gpt-neo-125M") -> HuggingFacePipeline:
     tokenizer = AutoTokenizer.from_pretrained(model_id)
     model = AutoModelForCausalLM.from_pretrained(model_id)
 
@@ -27,14 +27,10 @@ def get_hf_llm(model_id="EleutherAI/gpt-neo-125M"):
     return HuggingFacePipeline(pipeline=pipe)
 
 
-def build_qa_chain(persist_directory: str = "chroma_db", model_id="EleutherAI/gpt-neo-125M") -> RetrievalQA:
-    # Load ChromaDB
+def build_qa_chain(persist_directory: str = "chroma_db", model_id: str = "EleutherAI/gpt-neo-125M") -> RetrievalQA:
     vectordb = load_vector_store(persist_directory)
-
-    # HuggingFace LLM
     llm = get_hf_llm(model_id)
 
-    # Create RetrievalQA chain with custom prompt
     retriever = vectordb.as_retriever(search_kwargs={"k": 5})
 
     qa_chain = RetrievalQA.from_chain_type(

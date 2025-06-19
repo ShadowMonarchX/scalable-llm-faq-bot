@@ -1,20 +1,27 @@
+# api/model_api.py
+
 from fastapi import APIRouter
 from pydantic import BaseModel
-import torch
 from transformers import AutoTokenizer, AutoModelForCausalLM
+import torch
 
 router = APIRouter()
 
-# Load fine-tuned model from local directory
-model_path = "gpt-finetuned-customer-support"
-tokenizer = AutoTokenizer.from_pretrained(model_path)
-model = AutoModelForCausalLM.from_pretrained(model_path).eval()
+# Load model and tokenizer once at startup
+MODEL_PATH = "gpt-finetuned-customer-support"
+
+try:
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH).eval()
+    model.to("cuda" if torch.cuda.is_available() else "cpu")
+except Exception as e:
+    raise RuntimeError(f"Failed to load model from {MODEL_PATH}: {e}")
 
 class Query(BaseModel):
     question: str
 
 @router.post("/predict")
-def predict(query: Query):
+async def predict(query: Query):
     prompt = f"### Question:\n{query.question}\n\n### Answer:\n"
     inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
     with torch.no_grad():
@@ -26,5 +33,6 @@ def predict(query: Query):
             temperature=0.7,
             top_p=0.9
         )
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True).split("### Answer:")[-1].strip()
-    return {"answer": response}
+    decoded = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    answer = decoded.split("### Answer:")[-1].strip()
+    return {"answer": answer}

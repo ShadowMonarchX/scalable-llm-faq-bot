@@ -1,7 +1,8 @@
+# vector_store/embedder.py
+
 from sentence_transformers import SentenceTransformer
 from typing import List
 
-# You can change to a different model if needed
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 class Embedder:

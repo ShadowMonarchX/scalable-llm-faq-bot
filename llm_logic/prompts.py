@@ -1,4 +1,3 @@
-
 # llm_logic/prompts.py
 
 from langchain.prompts import PromptTemplate

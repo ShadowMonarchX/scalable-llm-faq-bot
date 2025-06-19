@@ -1,8 +1,10 @@
+# vector_store/chroma_config.py
+
 from chromadb.config import Settings
 
-# ChromaDB in-memory or persistent setup
+# ChromaDB configuration with persistent storage
 CHROMA_SETTINGS = Settings(
     chroma_db_impl="duckdb+parquet",
-    persist_directory="./chroma_db",  # persistent storage
+    persist_directory="./chroma_db",
     anonymized_telemetry=False
 )
