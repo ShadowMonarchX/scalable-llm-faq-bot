@@ -1,0 +1,12 @@
+tools:
+  - name: retrieve_from_docs
+    type: python
+    entrypoint: mcp_tools.retriever_tool:retrieve
+
+  - name: generate_answer
+    type: python
+    entrypoint: mcp_tools.llm_tool:generate
+
+pipeline:
+  - retrieve_from_docs
+  - generate_answer

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: faq-bot
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: faq-bot
+  template:
+    metadata:
+      labels:
+        app: faq-bot
+    spec:
+      containers:
+        - name: faq-bot
+          image: your-dockerhub/faq-bot:latest
+          ports:
+            - containerPort: 8000
