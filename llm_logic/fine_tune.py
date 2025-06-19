@@ -1,76 +1,109 @@
-import sys
 import os
 import torch
+import pandas as pd
+from datasets import Dataset
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
     Trainer,
     TrainingArguments,
-    DataCollatorForLanguageModeling,
+    PreTrainedTokenizerBase
 )
-from datasets import load_dataset
+from typing import List, Dict, Union
+from torch.nn.utils.rnn import pad_sequence
 
 # ------------------ Config ------------------ #
 model_name = "EleutherAI/gpt-neo-125M"
-default_data_path = "dataset/medical_o1_reasoning_sft/fine_tune_data.jsonl"
-output_dir = "./models/gpt_neo_finetuned"
-logging_dir = "./logs"
-
-# ------------------ CLI Dataset Path ------------------ #
-data_path = sys.argv[1] if len(sys.argv) > 1 else default_data_path
-if not os.path.exists(data_path):
-    raise FileNotFoundError(f"Dataset not found at: {data_path}")
+data_path = "/content/fine_tune_data.jsonl"
+output_dir = "./neo_outputs"
+logging_dir = "./neo_logs"
 
 # ------------------ Load Model & Tokenizer ------------------ #
-print(f"Loading model: {model_name}")
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(model_name)
+try:
+    print(f"Loading model: {model_name}")
+    tokenizer = AutoTokenizer.from_pretrained(model_name)
+    model = AutoModelForCausalLM.from_pretrained(model_name)
 
-if tokenizer.pad_token is None:
-    tokenizer.pad_token = tokenizer.eos_token
-    model.config.pad_token_id = tokenizer.eos_token_id
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+        model.config.pad_token_id = tokenizer.eos_token_id
 
-# ------------------ Optional: Check GPU BF16 support ------------------ #
-use_4bit = False
-compute_dtype = torch.float16
-if compute_dtype == torch.float16 and use_4bit and torch.cuda.is_available():
-    major, _ = torch.cuda.get_device_capability()
-    if major >= 8:
-        print("=" * 80)
-        print("Your GPU supports bfloat16: accelerate training with bf16=True")
-        print("=" * 80)
+    tokenizer.padding_side = "right"
+except Exception as e:
+    raise RuntimeError(f"Failed to load model/tokenizer: {e}")
 
-# ------------------ Load & Tokenize Dataset ------------------ #
-print(f"Loading dataset from: {data_path}")
-dataset = load_dataset("json", data_files=data_path, split="train")
+# ------------------ Load Dataset ------------------ #
+try:
+    abs_path = os.path.abspath(data_path)
+    print(f"Loading dataset from: {abs_path}")
+    df = pd.read_json(abs_path, lines=True)
+    dataset = Dataset.from_pandas(df)
+except Exception as e:
+    raise RuntimeError(f"Failed to load dataset: {e}")
 
+# ------------------ Tokenization ------------------ #
 def tokenize_function(example):
-    tokenized = tokenizer(
-        f"### Question:\n{example['prompt']}\n\n### Answer:\n{example['response']}",
-        truncation=True,
-        max_length=512,
-        padding="max_length",
-        return_attention_mask=True,
-        return_tensors="pt",  # Ensures tensor output
-    )
+    try:
+        text = f"### Question:\n{example['prompt']}\n\n### Answer:\n{example['response']}"
+        tokens = tokenizer(
+            text,
+            truncation=True,
+            max_length=512,
+            padding="max_length"
+        )
+        return {
+            "input_ids": tokens["input_ids"],
+            "attention_mask": tokens["attention_mask"],
+            "labels": tokens["input_ids"]
+        }
+    except Exception as e:
+        print(f"Tokenization failed for example: {example} — {e}")
+        return {
+            "input_ids": [],
+            "attention_mask": [],
+            "labels": []
+        }
 
-    # Convert from tensor -> list for HF Trainer compatibility
-    return {
-        "input_ids": tokenized["input_ids"][0].tolist(),
-        "attention_mask": tokenized["attention_mask"][0].tolist(),
-        "labels": tokenized["input_ids"][0].tolist()
-    }
-
-print("Tokenizing dataset...")
-tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=["prompt", "response"])
+try:
+    print("Tokenizing dataset...")
+    tokenized_dataset = dataset.map(tokenize_function, remove_columns=["prompt", "response"])
+    tokenized_dataset = tokenized_dataset.filter(lambda x: len(x["input_ids"]) > 0)
+except Exception as e:
+    raise RuntimeError(f"Tokenization or filtering failed: {e}")
 
 # ------------------ Train / Eval Split ------------------ #
-train_test = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
-train_dataset = train_test["train"]
-eval_dataset = train_test["test"]
+try:
+    split = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
+    train_dataset = split["train"]
+    eval_dataset = split["test"]
+except Exception as e:
+    raise RuntimeError(f"Dataset splitting failed: {e}")
 
-# ------------------ Data Collator ------------------ #
-data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
+# ------------------ Custom Data Collator ------------------ #
+class CausalDataCollator:
+    def __init__(self, tokenizer: PreTrainedTokenizerBase):
+        self.tokenizer = tokenizer
+
+    def __call__(self, features: List[Dict[str, Union[List[int], torch.Tensor]]]) -> Dict[str, torch.Tensor]:
+        features = [f for f in features if len(f["input_ids"]) > 0]
+        if len(features) == 0:
+            raise ValueError("No valid sequences in batch.")
+
+        input_ids = [torch.tensor(f["input_ids"]) for f in features]
+        attention_mask = [torch.tensor(f["attention_mask"]) for f in features]
+        labels = [torch.tensor(f["labels"]) for f in features]
+
+        input_ids = pad_sequence(input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
+        attention_mask = pad_sequence(attention_mask, batch_first=True, padding_value=0)
+        labels = pad_sequence(labels, batch_first=True, padding_value=-100)
+
+        return {
+            "input_ids": input_ids,
+            "attention_mask": attention_mask,
+            "labels": labels
+        }
+
+data_collator = CausalDataCollator(tokenizer)
 
 # ------------------ Training Arguments ------------------ #
 training_args = TrainingArguments(
@@ -100,13 +133,30 @@ trainer = Trainer(
     data_collator=data_collator
 )
 
-# ------------------ Train ------------------ #
-print("Starting training...")
-trainer.train()
+# ------------------ Sample Batch Check ------------------ #
+print("Checking a sample batch from the data collator...")
+try:
+    for i, batch in enumerate(trainer.get_train_dataloader()):
+        if i == 0:
+            for k, v in batch.items():
+                print(f"{k}: shape={v.shape}, dtype={v.dtype}")
+            break
+except Exception as e:
+    print(f"Error during batch inspection: {e}")
 
-# ------------------ Save ------------------ #
-final_output_path = os.path.join(output_dir, "final")
-print(f"Saving model to: {final_output_path}")
-trainer.save_model(final_output_path)
-tokenizer.save_pretrained(final_output_path)
-print("Training complete.")
+# ------------------ Training ------------------ #
+print("Starting training...")
+try:
+    trainer.train()
+except Exception as e:
+    raise RuntimeError(f"Training failed: {e}")
+
+# ------------------ Save Model ------------------ #
+try:
+    final_output_path = os.path.join(output_dir, "final")
+    print(f"Saving model to: {final_output_path}")
+    trainer.save_model(final_output_path)
+    tokenizer.save_pretrained(final_output_path)
+    print("Training complete.")
+except Exception as e:
+    raise RuntimeError(f"Saving model failed: {e}")
