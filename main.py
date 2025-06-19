@@ -45,7 +45,7 @@ agent = initialize_agent(
 # ------------------ Health Check ------------------ #
 @app.get("/")
 async def root():
-    return {"message": "✅ Scalable FAQ Bot is running."}
+    return {"message": "Scalable FAQ Bot is running."}
 
 # ------------------ MCP-Compatible Endpoint ------------------ #
 @app.post("/mcp-query")
