@@ -1,5 +1,6 @@
 import sys
 import os
+import torch
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
@@ -7,51 +8,71 @@ from transformers import (
     TrainingArguments,
     DataCollatorForLanguageModeling,
 )
-from datasets import load_dataset, DatasetDict
-from sklearn.model_selection import train_test_split
-import torch
+from datasets import load_dataset
 
-# ---------- Config ---------- #
+# ------------------ Config ------------------ #
 model_name = "EleutherAI/gpt-neo-125M"
 default_data_path = "dataset/medical_o1_reasoning_sft/fine_tune_data.jsonl"
 output_dir = "./models/gpt_neo_finetuned"
 logging_dir = "./logs"
 
-# ---------- CLI Argument ---------- #
+# ------------------ CLI Dataset Path ------------------ #
 data_path = sys.argv[1] if len(sys.argv) > 1 else default_data_path
 if not os.path.exists(data_path):
-    raise FileNotFoundError(f"Dataset not found at path: {data_path}")
+    raise FileNotFoundError(f"Dataset not found at: {data_path}")
 
-# ---------- Load Model & Tokenizer ---------- #
+# ------------------ Load Model & Tokenizer ------------------ #
 print(f"Loading model: {model_name}")
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(model_name)
 
-# ---------- Load Dataset ---------- #
+if tokenizer.pad_token is None:
+    tokenizer.pad_token = tokenizer.eos_token
+    model.config.pad_token_id = tokenizer.eos_token_id
+
+# ------------------ Optional: Check GPU BF16 support ------------------ #
+use_4bit = False
+compute_dtype = torch.float16
+if compute_dtype == torch.float16 and use_4bit and torch.cuda.is_available():
+    major, _ = torch.cuda.get_device_capability()
+    if major >= 8:
+        print("=" * 80)
+        print("Your GPU supports bfloat16: accelerate training with bf16=True")
+        print("=" * 80)
+
+# ------------------ Load & Tokenize Dataset ------------------ #
 print(f"Loading dataset from: {data_path}")
 dataset = load_dataset("json", data_files=data_path, split="train")
 
-# ---------- Tokenization ---------- #
 def tokenize_function(example):
-    return tokenizer(
+    tokenized = tokenizer(
         f"### Question:\n{example['prompt']}\n\n### Answer:\n{example['response']}",
-        padding="max_length",
         truncation=True,
-        max_length=512
+        max_length=512,
+        padding="max_length",
+        return_attention_mask=True,
+        return_tensors="pt",  # Ensures tensor output
     )
+
+    # Convert from tensor -> list for HF Trainer compatibility
+    return {
+        "input_ids": tokenized["input_ids"][0].tolist(),
+        "attention_mask": tokenized["attention_mask"][0].tolist(),
+        "labels": tokenized["input_ids"][0].tolist()
+    }
 
 print("Tokenizing dataset...")
 tokenized_dataset = dataset.map(tokenize_function, batched=True, remove_columns=["prompt", "response"])
 
-# ---------- Split into Train/Validation ---------- #
+# ------------------ Train / Eval Split ------------------ #
 train_test = tokenized_dataset.train_test_split(test_size=0.1, seed=42)
 train_dataset = train_test["train"]
 eval_dataset = train_test["test"]
 
-# ---------- Data Collator ---------- #
+# ------------------ Data Collator ------------------ #
 data_collator = DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False)
 
-# ---------- TrainingArguments ---------- #
+# ------------------ Training Arguments ------------------ #
 training_args = TrainingArguments(
     output_dir=output_dir,
     per_device_train_batch_size=4,
@@ -59,17 +80,17 @@ training_args = TrainingArguments(
     num_train_epochs=3,
     logging_dir=logging_dir,
     logging_steps=50,
-    evaluation_strategy="epoch",
-    save_strategy="epoch",
+    save_steps=500,
     save_total_limit=2,
     learning_rate=5e-5,
     weight_decay=0.01,
-    report_to="none",  # Set to "wandb" if using wandb
+    do_train=True,
+    do_eval=True,
     fp16=torch.cuda.is_available(),
-    load_best_model_at_end=True
+    report_to="none"
 )
 
-# ---------- Trainer ---------- #
+# ------------------ Trainer Setup ------------------ #
 trainer = Trainer(
     model=model,
     args=training_args,
@@ -79,12 +100,13 @@ trainer = Trainer(
     data_collator=data_collator
 )
 
-# ---------- Train ---------- #
+# ------------------ Train ------------------ #
 print("Starting training...")
 trainer.train()
 
-# ---------- Save Model ---------- #
-print(f"Saving fine-tuned model to: {output_dir}/final")
-trainer.save_model(f"{output_dir}/final")
-tokenizer.save_pretrained(f"{output_dir}/final")
-print("Training complete and model saved.")
+# ------------------ Save ------------------ #
+final_output_path = os.path.join(output_dir, "final")
+print(f"Saving model to: {final_output_path}")
+trainer.save_model(final_output_path)
+tokenizer.save_pretrained(final_output_path)
+print("Training complete.")
