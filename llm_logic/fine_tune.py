@@ -15,7 +15,7 @@ from torch.nn.utils.rnn import pad_sequence
 
 # ------------------ Config ------------------ #
 model_name = "EleutherAI/gpt-neo-125M"
-data_path = os.path.join(os.getcwd(), "dataset", "medical_o1_reasoning_sft", "fine_tune_data.jsonl")
+data_path = os.path.join(os.getcwd(), "dataset", "medical_meadow_wikidoc", "fine_tune_data.jsonl")
 output_dir = "./neo_outputs"
 logging_dir = "./neo_logs"
 
@@ -47,7 +47,7 @@ try:
     if not lines:
         raise ValueError("Dataset file is empty.")
 
-    records = [json.loads(line) for line in lines]  # ✅ FIXED HERE
+    records = [json.loads(line) for line in lines]
     df = pd.DataFrame(records)
 
     if df.empty:

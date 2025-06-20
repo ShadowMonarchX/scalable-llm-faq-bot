@@ -1,12 +1,9 @@
-# llm_logic/chains.py
-
 from langchain.chains import RetrievalQA
-from langchain.llms import HuggingFacePipeline
-from langchain.vectorstores import Chroma
-from langchain.embeddings import HuggingFaceEmbeddings
+from langchain_community.llms import HuggingFacePipeline
+from langchain_community.vectorstores import Chroma
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain.prompts import PromptTemplate
 from llm_logic.prompts import QA_PROMPT
-from vector_store.vector_handler import load_vector_store
 from transformers import pipeline, AutoTokenizer, AutoModelForCausalLM
 
 
@@ -28,10 +25,16 @@ def get_hf_llm(model_id: str = "EleutherAI/gpt-neo-125M") -> HuggingFacePipeline
 
 
 def build_qa_chain(persist_directory: str = "chroma_db", model_id: str = "EleutherAI/gpt-neo-125M") -> RetrievalQA:
-    vectordb = load_vector_store(persist_directory)
-    llm = get_hf_llm(model_id)
+    embedding_model = HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+
+    vectordb = Chroma(
+        collection_name="faq_documents",
+        persist_directory=persist_directory,
+        embedding_function=embedding_model,
+    )
 
     retriever = vectordb.as_retriever(search_kwargs={"k": 5})
+    llm = get_hf_llm(model_id)
 
     qa_chain = RetrievalQA.from_chain_type(
         llm=llm,

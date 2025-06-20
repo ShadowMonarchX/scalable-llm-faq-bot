@@ -3,7 +3,7 @@
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from langchain.agents import initialize_agent
-from langchain.llms import HuggingFaceHub
+from langchain_community.llms import HuggingFaceHub
 from mcp_tools.retriever_tool import retriever_tool
 from mcp_tools.llm_tool import llm_tool
 from api import all_routes  # Combine and expose all routers

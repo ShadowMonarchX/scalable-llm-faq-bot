@@ -1,19 +1,26 @@
-# api/model_api.py
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 from transformers import AutoTokenizer, AutoModelForCausalLM
+from huggingface_hub import login
 import torch
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 router = APIRouter()
 
 # Load model and tokenizer once at startup
 MODEL_PATH = "gpt-finetuned-customer-support"
+HF_TOKEN = os.getenv("HF_TOKEN") # Add this to your .env file
 
 try:
-    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH)
-    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH).eval()
-    model.to("cuda" if torch.cuda.is_available() else "cpu")
+    if HF_TOKEN:
+        login(token=HF_TOKEN)
+
+    tokenizer = AutoTokenizer.from_pretrained(MODEL_PATH, token=HF_TOKEN)
+    model = AutoModelForCausalLM.from_pretrained(MODEL_PATH, token=HF_TOKEN).eval()
+    model.to("cuda" if torch.cuda.is_available() else "mps" if torch.backends.mps.is_available() else "cpu")
 except Exception as e:
     raise RuntimeError(f"Failed to load model from {MODEL_PATH}: {e}")
 
